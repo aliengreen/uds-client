@@ -10,9 +10,9 @@ var mySingleton = (function () {
     // Instance stores a reference to the Singleton
     var instance;
 
-    var defTimeout   = 10000;
-        xdefLang     = 'en';
-        host         = 'https://admin.aliengreen.ge';
+    var defTimeout   = 10000,
+        xdefLang     = 'en',
+        host         = 'https://admin.aliengreen.ge',
         access_token = undefined;
 
   function init() {
@@ -22,11 +22,11 @@ var mySingleton = (function () {
         /* ------------------------------------------------------------ */
 
         // Private methods and variables
-        async function callApi(uri, param, key) {
+        async function callApi(uri, method, param, key) {
 
          var options = {
               url: host + uri,
-              method: 'POST',
+              method: method,
               json: true, 
               body: param
             };
@@ -37,7 +37,7 @@ var mySingleton = (function () {
             };
           }
 
-          return await new Promise((resolve, reject) => {
+          return new Promise((resolve, reject) => {
             request(options, function (error, response, body) {
               if(error) {
                 reject({code: error.errno, error: error.message});
@@ -45,7 +45,13 @@ var mySingleton = (function () {
                   if(response.statusCode != 200) {
                     reject({code: response.statusCode, error: statusCodeToMessage(response.statusCode)});
                   } else {
-                    resolve(body);
+                    
+                    /* Workaround !!! to detect error */
+                    if(body.result !== undefined && body.result.statusCode) {
+                        reject({code: body.result.statusCode, error: body.result.message});
+                    } else {
+                        resolve(body);
+                    }
                   }
               }
              });
@@ -74,7 +80,11 @@ var mySingleton = (function () {
     return {
 
             // Public methods and variables
-            login: async (email, password) => {
+            getAccessToken: () => {
+                return access_token;
+            },
+
+            loginSync: async (email, password) => {
 
                 var param = {
                   email: email,
@@ -82,7 +92,7 @@ var mySingleton = (function () {
                 };
 
                 try {
-                    let result = await callApi('/auth/login', param);
+                    let result = await callApi('/auth/login', 'POST', param);
                     access_token = result.access_token;
                     return {access_token: result.access_token};
                 } catch (err) {
@@ -90,7 +100,39 @@ var mySingleton = (function () {
                 }
             },
           
-            getRegister: async(eui64, reg) => {
+            logoutSync: async () => {
+
+                try {
+                    return callApi('/auth/logout', 'POST', {}, access_token);
+                } catch (err) {
+                   return err;
+                }
+            },
+
+
+            getConfigSync: async() => {
+
+                try {
+                    let result = await callApi('/api/config', 'GET', {}, access_token);
+                    return result;
+                } catch (err) {
+                   return err;
+                }
+
+            },
+
+            setConfigSync: async(conf) => {
+
+                try {
+                    let result = await callApi('/api/config', 'POST', conf, access_token);
+                    return result;
+                } catch (err) {
+                   return err;
+                }
+
+            },
+
+            getRegisterSync: async(eui64, reg) => {
 
                 var param = {
                   euid_64: eui64,
@@ -99,7 +141,7 @@ var mySingleton = (function () {
                 };
 
                 try {
-                    let result = await callApi('/api/registers', param, access_token);
+                    let result = await callApi('/api/registers', 'POST', param, access_token);
                     return {result: result.result.records};
                 } catch (err) {
                    return err;
@@ -107,7 +149,18 @@ var mySingleton = (function () {
 
             },
 
-            putRegister: async(eui64, reg, value, value_len, type) => {
+            getRegister: async(eui64, reg) => {
+
+                var param = {
+                  euid_64: eui64,
+                  type: 'get_register',
+                  register_name: reg
+                };
+
+                return callApi('/api/registers', 'POST', param, access_token);
+            },
+
+            putRegisterSync: async(eui64, reg, value, value_len, type) => {
 
                 var param = {
                   euid_64: eui64,
@@ -119,14 +172,14 @@ var mySingleton = (function () {
                 };
 
                 try {
-                    let result = await callApi('/api/registers', param, access_token);
+                    let result = await callApi('/api/registers', 'POST', param, access_token);
                     return {result: result.result};
                 } catch (err) {
                    return err;
                 }
             },
 
-            getStatus: async(eui64) => {
+            getStatusSync: async(eui64) => {
 
                 var param = {
                   euid_64: eui64,
@@ -134,7 +187,7 @@ var mySingleton = (function () {
                 };
 
                 try {
-                    let result = await callApi('/api/registers', param, access_token);
+                    let result = await callApi('/api/registers', 'POST', param, access_token);
                     return {result: result.result};
                 } catch (err) {
                    return err;
@@ -142,10 +195,10 @@ var mySingleton = (function () {
 
             },
 
-            restartDevice: async(eui64) => {
+            restartDeviceSync: async(eui64) => {
 
                 try {
-                    let result = await instance.putRegister(eui64, 0x0136, 1, 1, 'uint');
+                    let result = await instance.putRegisterSync(eui64, 0x0136, 1, 1, 'uint');
                     return result;
                 } catch (err) {
                    return err;
