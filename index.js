@@ -100,7 +100,7 @@ var mySingleton = (function () {
                 }
             },
           
-            logoutSync: async () => {
+            logout: async () => {
 
                 try {
                     return callApi('/auth/logout', 'POST', {}, access_token);
